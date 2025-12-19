@@ -1,9 +1,45 @@
-from typing import Any, Callable, Hashable, TypeAlias, TypedDict, TypeVar, Union
+from typing import Any, Callable, Hashable, Protocol, TypeAlias, TypedDict, TypeVar
 
-Number: TypeAlias = Union[int, float]
+Number: TypeAlias = int | float
 CacheKeyFunction: TypeAlias = Callable[[tuple, dict], Hashable]
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+class CacheEntryProtocol(Protocol):
+    """Protocol for cache entry objects."""
+
+    result: Any
+
+    def is_expired(self) -> bool: ...
+
+
+class CacheBackend(Protocol):
+    """Protocol defining the interface for cache storage backends."""
+
+    def get(self, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntryProtocol | None:
+        """Retrieve a cache entry. Returns None if not found, expired, or skip_cache is True."""
+        ...
+
+    def set(self, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
+        """Store a result in the cache with optional TTL."""
+        ...
+
+    def is_expired(self, function_id: str, cache_key: str) -> bool:
+        """Check if a cache entry is expired or doesn't exist."""
+        ...
+
+    async def aget(self, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntryProtocol | None:
+        """Async version of get."""
+        ...
+
+    async def aset(self, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
+        """Async version of set."""
+        ...
+
+    async def ais_expired(self, function_id: str, cache_key: str) -> bool:
+        """Async version of is_expired."""
+        ...
 
 
 class CacheKwargs(TypedDict, total=False):

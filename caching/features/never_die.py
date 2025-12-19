@@ -5,14 +5,14 @@ import threading
 import time
 from asyncio import AbstractEventLoop
 from concurrent.futures import Future as ConcurrentFuture
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from caching._async.lock import _ASYNC_LOCKS
 from caching._sync.lock import _SYNC_LOCKS
-from caching.bucket import CacheBucket
+from caching.bucket import CacheBucket, MemoryBackend
 from caching.config import logger
-from caching.types import CacheKeyFunction, Number
+from caching.types import CacheBackend, CacheKeyFunction, Number
 from caching.utils.functions import get_function_id
 
 _NEVER_DIE_THREAD: threading.Thread | None = None
@@ -31,6 +31,7 @@ class NeverDieCacheEntry:
     cache_key_func: CacheKeyFunction | None
     ignore_fields: tuple[str, ...]
     loop: AbstractEventLoop | None
+    backend: type[CacheBackend] = field(default=MemoryBackend)
 
     def __post_init__(self):
         self._backoff: float = 1
@@ -54,10 +55,10 @@ class NeverDieCacheEntry:
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, NeverDieCacheEntry):
             return False
-        return self.id == other.id and self.cache_key == other.cache_key
+        return self.id == other.id and self.cache_key == other.cache_key and self.backend == other.backend
 
     def __hash__(self) -> int:
-        return hash((self.id, self.cache_key))
+        return hash((self.id, self.cache_key, self.backend))
 
     def is_expired(self) -> bool:
         return time.monotonic() > self._expires_at
@@ -71,14 +72,43 @@ class NeverDieCacheEntry:
         self._expires_at = time.monotonic() + self.ttl * self._backoff
 
 
+def _get_sync_lock(entry: NeverDieCacheEntry):
+    """Get the appropriate sync lock for the entry's backend."""
+    from caching.backends.redis import RedisBackend
+
+    if entry.backend is not RedisBackend:
+        return _SYNC_LOCKS[entry.id][entry.cache_key]
+
+    from caching.backends.redis_lock import RedisLockManager
+
+    return RedisLockManager.sync_lock(entry.id, entry.cache_key)
+
+
+def _get_async_lock(entry: NeverDieCacheEntry):
+    """Get the appropriate async lock for the entry's backend."""
+    from caching.backends.redis import RedisBackend
+
+    if entry.backend is not RedisBackend:
+        return _ASYNC_LOCKS[entry.id][entry.cache_key]
+
+    from caching.backends.redis_lock import RedisLockManager
+
+    return RedisLockManager.async_lock(entry.id, entry.cache_key)
+
+
 def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    with _SYNC_LOCKS[entry.id][entry.cache_key]:
+    try:
+        lock = _get_sync_lock(entry)
+    except RuntimeError:
+        # Backend no longer available (e.g., Redis was reset)
+        return
+
+    with lock:
         try:
             result = entry.function(*entry.args, **entry.kwargs)
-            CacheBucket.set(entry.id, entry.cache_key, result, None)
+            entry.backend.set(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -89,12 +119,17 @@ def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
 
 async def _run_async_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    async with _ASYNC_LOCKS[entry.id][entry.cache_key]:
+    try:
+        lock = _get_async_lock(entry)
+    except RuntimeError:
+        # Backend no longer available (e.g., Redis was reset)
+        return
+
+    async with lock:
         try:
             result = await entry.function(*entry.args, **entry.kwargs)
-            CacheBucket.set(entry.id, entry.cache_key, result, None)
+            await entry.backend.aset(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -179,9 +214,15 @@ def register_never_die_function(
     kwargs: dict,
     cache_key_func: CacheKeyFunction | None,
     ignore_fields: tuple[str, ...],
+    backend: type[CacheBackend] = MemoryBackend,
 ) -> None:
-    """Register a function for never_die cache refreshing"""
+    """Register a function for never_die cache refreshing (memory backend)"""
     is_async = inspect.iscoroutinefunction(function)
+
+    try:
+        loop = asyncio.get_running_loop() if is_async else None
+    except RuntimeError:
+        loop = None
 
     entry = NeverDieCacheEntry(
         function,
@@ -190,7 +231,8 @@ def register_never_die_function(
         kwargs,
         cache_key_func,
         ignore_fields,
-        asyncio.get_event_loop() if is_async else None,
+        loop,
+        backend,
     )
 
     with _NEVER_DIE_LOCK:
@@ -198,3 +240,26 @@ def register_never_die_function(
             _NEVER_DIE_REGISTRY.append(entry)
 
     _start_never_die_thread()
+
+
+def register_never_die_function_redis(
+    function: Callable[..., Any],
+    ttl: Number,
+    args: tuple,
+    kwargs: dict,
+    cache_key_func: CacheKeyFunction | None,
+    ignore_fields: tuple[str, ...],
+    backend: type[CacheBackend],
+) -> None:
+    """Register a function for never_die cache refreshing (Redis backend)"""
+    from caching.backends.redis import RedisBackend
+
+    register_never_die_function(
+        function,
+        ttl,
+        args,
+        kwargs,
+        cache_key_func,
+        ignore_fields,
+        RedisBackend,
+    )

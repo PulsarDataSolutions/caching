@@ -1,3 +1,4 @@
+import contextlib
 import time
 from dataclasses import dataclass, field
 from inspect import Signature
@@ -28,24 +29,24 @@ class CacheEntry:
         return self.time() > self.expires_at
 
 
-class CacheBucket:
+class MemoryBackend:
+    """In-memory cache backend implementing CacheBackend protocol."""
+
     _CACHE: dict[tuple[str, str], CacheEntry] = {}
 
     @classmethod
     def clear_expired_cached_items(cls):
         """Clear expired cached items from the cache bucket."""
         while True:
-            try:
+            with contextlib.suppress(Exception):
                 for key, entry in list(cls._CACHE.items()):
                     if entry.is_expired():
                         del cls._CACHE[key]
-            except Exception:
-                pass
-            finally:
-                time.sleep(10)
+
+            time.sleep(10)
 
     @classmethod
-    def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None):
+    def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
         cls._CACHE[function_id, cache_key] = CacheEntry(result, ttl)
 
     @classmethod
@@ -58,10 +59,23 @@ class CacheBucket:
         return None
 
     @classmethod
-    def is_cache_expired(cls, function_id: str, cache_key: str) -> bool:
+    def is_expired(cls, function_id: str, cache_key: str) -> bool:
         if entry := cls._CACHE.get((function_id, cache_key)):
             return entry.is_expired()
         return True
+
+    # Async methods (same as sync for memory backend)
+    @classmethod
+    async def aset(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
+        cls.set(function_id, cache_key, result, ttl)
+
+    @classmethod
+    async def aget(cls, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntry | None:
+        return cls.get(function_id, cache_key, skip_cache)
+
+    @classmethod
+    async def ais_expired(cls, function_id: str, cache_key: str) -> bool:
+        return cls.is_expired(function_id, cache_key)
 
     @classmethod
     def clear(cls):
@@ -110,3 +124,7 @@ class CacheBucket:
                 continue
 
             yield name, value
+
+
+# Backwards compatibility alias
+CacheBucket = MemoryBackend
