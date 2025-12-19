@@ -106,7 +106,7 @@ updated_user = get_user_data(123)
 Run the test scripts
 
 ```bash
-python -m pytest
+poetry run python -m pytest
 ```
 
 ## License
