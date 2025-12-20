@@ -45,7 +45,7 @@ class RedisBackend:
     def _serialize(cls, entry: RedisCacheEntry) -> bytes:
         """Serialize a cache entry to bytes."""
         try:
-            return pickle.dumps(entry)
+            return pickle.dumps(entry, protocol=pickle.HIGHEST_PROTOCOL)
         except (pickle.PicklingError, TypeError, AttributeError) as exc:
             raise TypeError(
                 f"Failed to serialize cache entry. Object of type {type(entry.result).__name__} "
