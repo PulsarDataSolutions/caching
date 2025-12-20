@@ -36,7 +36,7 @@ def redis_cache(
     from caching.features.never_die import register_never_die_function_redis
 
     if cache_key_func and ignore_fields:
-        raise Exception("Either cache_key_func or ignore_fields can be provided, but not both")
+        raise ValueError("Either cache_key_func or ignore_fields can be provided, but not both")
 
     def decorator(function: F) -> F:
         if not inspect.iscoroutinefunction(function):

@@ -21,6 +21,10 @@ _NEVER_DIE_REGISTRY: list["NeverDieCacheEntry"] = []
 _NEVER_DIE_CACHE_THREADS: dict[str, threading.Thread] = {}
 _NEVER_DIE_CACHE_FUTURES: dict[str, ConcurrentFuture] = {}
 
+_BACKOFF_MULTIPLIER: float = 1.25
+_MAX_BACKOFF: float = 10.0
+_REFRESH_INTERVAL_SECONDS: float = 0.1
+
 
 @dataclass
 class NeverDieCacheEntry:
@@ -68,7 +72,7 @@ class NeverDieCacheEntry:
         self._expires_at = time.monotonic() + self.ttl
 
     def revive(self):
-        self._backoff = min(self._backoff * 1.25, 10)
+        self._backoff = min(self._backoff * _BACKOFF_MULTIPLIER, _MAX_BACKOFF)
         self._expires_at = time.monotonic() + self.ttl * self._backoff
 
 
@@ -180,7 +184,7 @@ def _refresh_never_die_caches():
                 _NEVER_DIE_CACHE_FUTURES[entry.cache_key] = future
 
         finally:
-            time.sleep(0.1)
+            time.sleep(_REFRESH_INTERVAL_SECONDS)
             _clear_dead_futures()
             _clear_dead_threads()
 
@@ -214,7 +218,7 @@ def register_never_die_function(
         kwargs,
         cache_key_func,
         ignore_fields,
-        asyncio.get_event_loop() if is_async else None,
+        asyncio.get_running_loop() if is_async else None,
         backend,
     )
 
@@ -235,8 +239,6 @@ def register_never_die_function_redis(
     backend: type[CacheBackend],
 ) -> None:
     """Register a function for never_die cache refreshing (Redis backend)"""
-    from caching.backends.redis import RedisBackend
-
     register_never_die_function(
         function,
         ttl,
@@ -244,5 +246,5 @@ def register_never_die_function_redis(
         kwargs,
         cache_key_func,
         ignore_fields,
-        RedisBackend,
+        backend,
     )

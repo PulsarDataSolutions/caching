@@ -6,6 +6,8 @@ from typing import Any
 
 from caching.types import CacheKeyFunction, Number
 
+_CACHE_CLEAR_INTERVAL_SECONDS: int = 10
+
 
 @dataclass
 class CacheEntry:
@@ -43,7 +45,7 @@ class MemoryBackend:
                     if entry.is_expired():
                         del cls._CACHE[key]
 
-            time.sleep(10)
+            time.sleep(_CACHE_CLEAR_INTERVAL_SECONDS)
 
     @classmethod
     def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
@@ -97,10 +99,10 @@ class MemoryBackend:
         cache_key = cache_key_func(args, kwargs)
         try:
             return str(hash(cache_key))
-        except TypeError:
-            raise Exception(
-                "Cache key function must be return an hashable cache key - be carefull with mutable types (list, dict, set) and non built-in types"
-            )
+        except TypeError as exc:
+            raise ValueError(
+                "Cache key function must return a hashable cache key - be careful with mutable types (list, dict, set) and non built-in types"
+            ) from exc
 
     @classmethod
     def iter_arguments(cls, function_signature: Signature, args: tuple, kwargs: dict, ignore_fields: tuple[str, ...]):
