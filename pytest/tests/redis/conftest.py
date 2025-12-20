@@ -1,5 +1,6 @@
 import os
 import pytest
+import pytest_asyncio
 import redis
 import redis.asyncio as aioredis
 
@@ -20,19 +21,21 @@ def sync_redis_client():
     """Create a sync Redis client for testing."""
     try:
         client = redis.from_url(get_redis_url())
-        client.ping()  # Test connection
+        client.ping()
         yield client
         client.close()
     except redis.ConnectionError:
         pytest.skip("Redis server not available")
 
 
-@pytest.fixture(scope="function")
-def async_redis_client():
+@pytest_asyncio.fixture(scope="function")
+async def async_redis_client():
     """Create an async Redis client for testing."""
     try:
         client = aioredis.from_url(get_redis_url())
+        await client.ping()  # type: ignore
         yield client
+        await client.aclose()
     except redis.ConnectionError:
         pytest.skip("Redis server not available")
 
