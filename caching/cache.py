@@ -3,8 +3,11 @@ import threading
 from typing import Callable
 
 from caching._async import async_decorator
+from caching._async.lock import _ASYNC_LOCKS
 from caching._sync import sync_decorator
-from caching.bucket import CacheBucket
+from caching._sync.lock import _SYNC_LOCKS
+from caching.bucket import CacheBucket, MemoryBackend
+from caching.features.never_die import register_never_die_function
 from caching.types import CacheKeyFunction, F, Number
 
 _CACHE_CLEAR_THREAD: threading.Thread | None = None
@@ -49,9 +52,27 @@ def cache(
 
     _start_cache_clear_thread()
 
-    def decorator(function):
+    def decorator(function: F) -> F:
         if inspect.iscoroutinefunction(function):
-            return async_decorator(function, ttl, never_die, cache_key_func, ignore_fields)
-        return sync_decorator(function, ttl, never_die, cache_key_func, ignore_fields)
+            return async_decorator(
+                function=function,
+                ttl=ttl,
+                never_die=never_die,
+                cache_key_func=cache_key_func,
+                ignore_fields=ignore_fields,
+                backend=MemoryBackend,
+                lock_context=lambda fid, ckey: _ASYNC_LOCKS[fid][ckey],
+                register_never_die=register_never_die_function,
+            )
+        return sync_decorator(
+            function=function,
+            ttl=ttl,
+            never_die=never_die,
+            cache_key_func=cache_key_func,
+            ignore_fields=ignore_fields,
+            backend=MemoryBackend,
+            lock_context=lambda fid, ckey: _SYNC_LOCKS[fid][ckey],
+            register_never_die=register_never_die_function,
+        )
 
     return decorator
