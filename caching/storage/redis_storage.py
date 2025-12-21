@@ -3,14 +3,14 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from caching.backends.redis_config import get_redis_config
+from caching.redis.config import get_redis_config
 from caching.config import logger
 from caching.types import Number
 
 
 @dataclass
 class RedisCacheEntry:
-    """Cache entry for Redis backend using Unix timestamps for portability."""
+    """Cache entry for Redis storage using Unix timestamps for portability."""
 
     result: Any
     ttl: float | None
@@ -32,8 +32,8 @@ class RedisCacheEntry:
         return self.time() > self.expires_at
 
 
-class RedisBackend:
-    """Redis cache backend implementing CacheBackend protocol."""
+class RedisStorage:
+    """Redis cache storage implementing CacheStorage protocol."""
 
     @classmethod
     def _make_key(cls, function_id: str, cache_key: str) -> str:
@@ -77,7 +77,6 @@ class RedisBackend:
                 "Provide async_client in setup_redis_config() to use @redis_cache on async functions."
             )
 
-    # Sync methods
     @classmethod
     def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
         """Store a result in Redis cache."""
@@ -143,7 +142,6 @@ class RedisBackend:
             logger.debug(f"Redis is_expired error (silent mode): {exc}")
             return True
 
-    # Async methods
     @classmethod
     async def aset(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
         """Store a result in Redis cache (async)."""

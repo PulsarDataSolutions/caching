@@ -8,10 +8,10 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 @dataclass(frozen=True, slots=True)
-class BackendConfig:
-    """Configuration for cache backend, grouping backend, lock, and never_die registration."""
+class CacheConfig:
+    """Configuration for cache, grouping storage, lock, and never_die registration."""
 
-    backend: "CacheBackend"
+    storage: "CacheStorage"
     sync_lock: Callable[[str, str], ContextManager]
     async_lock: Callable[[str, str], AsyncContextManager]
     register_never_die: Callable[..., None]
@@ -25,8 +25,8 @@ class CacheEntryProtocol(Protocol):
     def is_expired(self) -> bool: ...
 
 
-class CacheBackend(Protocol):
-    """Protocol defining the interface for cache storage backends."""
+class CacheStorage(Protocol):
+    """Protocol defining the interface for cache storage."""
 
     def get(self, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntryProtocol | None:
         """Retrieve a cache entry. Returns None if not found, expired, or skip_cache is True."""

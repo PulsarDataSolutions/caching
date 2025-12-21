@@ -3,13 +3,13 @@ from typing import Callable
 
 from caching._async import async_decorator
 from caching._sync import sync_decorator
-from caching.backends.redis import RedisBackend
-from caching.backends.redis_lock import RedisLockManager
 from caching.features.never_die import register_never_die_function_redis
-from caching.types import BackendConfig, CacheKeyFunction, F, Number
+from caching.redis.lock import RedisLockManager
+from caching.storage.redis_storage import RedisStorage
+from caching.types import CacheConfig, CacheKeyFunction, F, Number
 
-_REDIS_CONFIG = BackendConfig(
-    backend=RedisBackend,
+_REDIS_CONFIG = CacheConfig(
+    storage=RedisStorage,
     sync_lock=RedisLockManager.sync_lock,
     async_lock=RedisLockManager.async_lock,
     register_never_die=register_never_die_function_redis,

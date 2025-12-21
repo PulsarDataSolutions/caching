@@ -1,8 +1,9 @@
-from redis.lock import Lock
-from typing import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, contextmanager
+from typing import AsyncIterator, Iterator
 
-from caching.backends.redis_config import get_redis_config
+from redis.lock import Lock
+
+from caching.redis.config import get_redis_config
 
 
 class RedisLockManager:
@@ -35,7 +36,7 @@ class RedisLockManager:
             lock_key,
             timeout=config.lock_timeout,
             blocking=True,
-            blocking_timeout=None,  # Wait indefinitely like memory backend
+            blocking_timeout=None,
         )
 
         acquired = lock.acquire()
@@ -71,7 +72,7 @@ class RedisLockManager:
             lock_key,
             timeout=config.lock_timeout,
             blocking=True,
-            blocking_timeout=None,  # Wait indefinitely like memory backend
+            blocking_timeout=None,
         )
 
         acquired = await lock.acquire()

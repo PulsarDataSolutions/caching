@@ -6,15 +6,15 @@ from caching._async import async_decorator
 from caching._async.lock import _ASYNC_LOCKS
 from caching._sync import sync_decorator
 from caching._sync.lock import _SYNC_LOCKS
-from caching.bucket import CacheBucket, MemoryBackend
 from caching.features.never_die import register_never_die_function
-from caching.types import BackendConfig, CacheKeyFunction, F, Number
+from caching.storage.memory_storage import MemoryStorage
+from caching.types import CacheConfig, CacheKeyFunction, F, Number
 
 _CACHE_CLEAR_THREAD: threading.Thread | None = None
 _CACHE_CLEAR_LOCK: threading.Lock = threading.Lock()
 
-_MEMORY_CONFIG = BackendConfig(
-    backend=MemoryBackend,
+_MEMORY_CONFIG = CacheConfig(
+    storage=MemoryStorage,
     sync_lock=lambda fid, ckey: _SYNC_LOCKS[fid][ckey],
     async_lock=lambda fid, ckey: _ASYNC_LOCKS[fid][ckey],
     register_never_die=register_never_die_function,
@@ -27,7 +27,7 @@ def _start_cache_clear_thread():
     with _CACHE_CLEAR_LOCK:
         if _CACHE_CLEAR_THREAD and _CACHE_CLEAR_THREAD.is_alive():
             return
-        _CACHE_CLEAR_THREAD = threading.Thread(target=CacheBucket.clear_expired_cached_items, daemon=True)
+        _CACHE_CLEAR_THREAD = threading.Thread(target=MemoryStorage.clear_expired_cached_items, daemon=True)
         _CACHE_CLEAR_THREAD.start()
 
 

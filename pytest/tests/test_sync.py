@@ -3,7 +3,7 @@ import pytest
 import threading
 from collections.abc import Callable
 
-from caching.bucket import MemoryBackend
+from caching.storage.memory_storage import MemoryStorage
 from caching.memory_cache import cache
 
 TTL = 0.1
@@ -11,7 +11,7 @@ TTL = 0.1
 
 @pytest.fixture()
 def function_with_cache():
-    MemoryBackend.clear()  # Clear cache before each test
+    MemoryStorage.clear()  # Clear cache before each test
     call_count = 0
 
     @cache(ttl=TTL)
