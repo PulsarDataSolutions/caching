@@ -10,7 +10,7 @@ _CACHE_CLEAR_INTERVAL_SECONDS: int = 10
 
 
 @dataclass
-class CacheEntry:
+class MemoryCacheEntry:
     result: Any
     ttl: float | None
 
@@ -34,7 +34,7 @@ class CacheEntry:
 class MemoryStorage:
     """In-memory cache storage implementing CacheStorage protocol."""
 
-    _CACHE: dict[tuple[str, str], CacheEntry] = {}
+    _CACHE: dict[tuple[str, str], MemoryCacheEntry] = {}
 
     @classmethod
     def clear_expired_cached_items(cls):
@@ -49,10 +49,10 @@ class MemoryStorage:
 
     @classmethod
     def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None) -> None:
-        cls._CACHE[function_id, cache_key] = CacheEntry(result, ttl)
+        cls._CACHE[function_id, cache_key] = MemoryCacheEntry(result, ttl)
 
     @classmethod
-    def get(cls, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntry | None:
+    def get(cls, function_id: str, cache_key: str, skip_cache: bool) -> MemoryCacheEntry | None:
         if skip_cache:
             return None
         if entry := cls._CACHE.get((function_id, cache_key)):
@@ -71,7 +71,7 @@ class MemoryStorage:
         cls.set(function_id, cache_key, result, ttl)
 
     @classmethod
-    async def aget(cls, function_id: str, cache_key: str, skip_cache: bool) -> CacheEntry | None:
+    async def aget(cls, function_id: str, cache_key: str, skip_cache: bool) -> MemoryCacheEntry | None:
         return cls.get(function_id, cache_key, skip_cache)
 
     @classmethod
