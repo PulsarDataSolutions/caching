@@ -25,7 +25,7 @@ def _async_decorator(
         cache_key = MemoryStorage.create_cache_key(function_signature, cache_key_func, ignore_fields, args, kwargs)
 
         if never_die:
-            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
+            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config)
 
         if cache_entry := await config.storage.aget(function_id, cache_key, skip_cache):
             return cache_entry.result
@@ -58,7 +58,7 @@ def _sync_decorator(
         cache_key = MemoryStorage.create_cache_key(function_signature, cache_key_func, ignore_fields, args, kwargs)
 
         if never_die:
-            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
+            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config)
 
         if cache_entry := config.storage.get(function_id, cache_key, skip_cache):
             return cache_entry.result

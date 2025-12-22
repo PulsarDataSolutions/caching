@@ -10,9 +10,8 @@ from typing import Any, Callable
 
 from caching.config import logger
 from caching.storage.memory_storage import MemoryStorage
-from caching.types import CacheKeyFunction, CacheStorage, Number
+from caching.types import CacheConfig, CacheKeyFunction, Number
 from caching.utils.functions import get_function_id
-from caching.utils.locks import ASYNC_LOCKS, SYNC_LOCKS
 
 _NEVER_DIE_THREAD: threading.Thread | None = None
 _NEVER_DIE_LOCK: threading.Lock = threading.Lock()
@@ -20,8 +19,8 @@ _NEVER_DIE_REGISTRY: list["NeverDieCacheEntry"] = []
 _NEVER_DIE_CACHE_THREADS: dict[str, threading.Thread] = {}
 _NEVER_DIE_CACHE_FUTURES: dict[str, ConcurrentFuture] = {}
 
+_MAX_BACKOFF: int = 10
 _BACKOFF_MULTIPLIER: float = 1.25
-_MAX_BACKOFF: float = 10.0
 _REFRESH_INTERVAL_SECONDS: float = 0.1
 
 
@@ -34,7 +33,7 @@ class NeverDieCacheEntry:
     cache_key_func: CacheKeyFunction | None
     ignore_fields: tuple[str, ...]
     loop: AbstractEventLoop | None
-    storage: CacheStorage
+    config: CacheConfig
 
     def __post_init__(self):
         self._backoff: float = 1
@@ -58,10 +57,10 @@ class NeverDieCacheEntry:
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, NeverDieCacheEntry):
             return False
-        return self.id == other.id and self.cache_key == other.cache_key and self.storage == other.storage
+        return self.id == other.id and self.cache_key == other.cache_key
 
     def __hash__(self) -> int:
-        return hash((self.id, self.cache_key, self.storage))
+        return hash((self.id, self.cache_key))
 
     def is_expired(self) -> bool:
         return time.monotonic() > self._expires_at
@@ -75,36 +74,13 @@ class NeverDieCacheEntry:
         self._expires_at = time.monotonic() + self.ttl * self._backoff
 
 
-def _get_sync_lock(entry: NeverDieCacheEntry):
-    """Get the appropriate sync lock for the entry's storage."""
-    if entry.storage == MemoryStorage:
-        return SYNC_LOCKS[entry.id][entry.cache_key]
-
-    # Redis storage - use RedisLockManager
-    from caching.redis.lock import RedisLockManager
-
-    return RedisLockManager.sync_lock(entry.id, entry.cache_key)
-
-
-def _get_async_lock(entry: NeverDieCacheEntry):
-    """Get the appropriate async lock for the entry's storage."""
-    if entry.storage == MemoryStorage:
-        return ASYNC_LOCKS[entry.id][entry.cache_key]
-
-    # Redis storage - use RedisLockManager
-    from caching.redis.lock import RedisLockManager
-
-    return RedisLockManager.async_lock(entry.id, entry.cache_key)
-
-
 def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    with _get_sync_lock(entry):
+    with entry.config.sync_lock(entry.id, entry.cache_key):
         try:
             result = entry.function(*entry.args, **entry.kwargs)
-            entry.storage.set(entry.id, entry.cache_key, result, None)
+            entry.config.storage.set(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -115,12 +91,11 @@ def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
 
 async def _run_async_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    async with _get_async_lock(entry):
+    async with entry.config.async_lock(entry.id, entry.cache_key):
         try:
             result = await entry.function(*entry.args, **entry.kwargs)
-            await entry.storage.aset(entry.id, entry.cache_key, result, None)
+            await entry.config.storage.aset(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -204,9 +179,9 @@ def register_never_die_function(
     kwargs: dict,
     cache_key_func: CacheKeyFunction | None,
     ignore_fields: tuple[str, ...],
-    storage: CacheStorage,
+    config: CacheConfig,
 ):
-    """Register a function for never_die cache refreshing (memory storage)"""
+    """Register a function for never_die cache refreshing"""
     is_async = inspect.iscoroutinefunction(function)
 
     entry = NeverDieCacheEntry(
@@ -217,7 +192,7 @@ def register_never_die_function(
         cache_key_func=cache_key_func,
         ignore_fields=ignore_fields,
         loop=asyncio.get_running_loop() if is_async else None,
-        storage=storage,
+        config=config,
     )
 
     with _NEVER_DIE_LOCK:
