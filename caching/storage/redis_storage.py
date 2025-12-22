@@ -39,26 +39,6 @@ class RedisStorage:
         return pickle.loads(data)
 
     @classmethod
-    def _require_sync_client(cls):
-        """Raise if sync client not configured."""
-        config = get_redis_config()
-        if config.sync_client is None:
-            raise RuntimeError(
-                "Redis sync client not configured. "
-                "Provide sync_client in setup_redis_config() to use @redis_cache on sync functions."
-            )
-
-    @classmethod
-    def _require_async_client(cls):
-        """Raise if async client not configured."""
-        config = get_redis_config()
-        if config.async_client is None:
-            raise RuntimeError(
-                "Redis async client not configured. "
-                "Provide async_client in setup_redis_config() to use @redis_cache on async functions."
-            )
-
-    @classmethod
     def _prepare_set(
         cls, function_id: str, cache_key: str, result: Any, ttl: Number | None
     ) -> tuple[str, bytes, int | None]:
@@ -75,19 +55,20 @@ class RedisStorage:
         config = get_redis_config()
         if config.on_error == "raise":
             raise
-        logger.debug(f"Redis {operation} error (silent mode): {exc}")
+        logger.warning(f"Redis {operation} error (silent mode): {exc}")
 
     @classmethod
     def set(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None):
         """Store a result in Redis cache."""
-        cls._require_sync_client()
         config = get_redis_config()
+        client = config.get_client(is_async=False)
         key, data, expiry = cls._prepare_set(function_id, cache_key, result, ttl)
         try:
             if expiry is None:
-                config.sync_client.set(key, data)
-            else:
-                config.sync_client.setex(key, expiry, data)
+                client.set(key, data)
+                return
+
+            client.setex(key, expiry, data)
         except Exception as exc:
             cls._handle_error(exc, "set")
 
@@ -97,17 +78,18 @@ class RedisStorage:
         if skip_cache:
             return None
 
-        cls._require_sync_client()
         config = get_redis_config()
+        client = config.get_client(is_async=False)
         key = cls._make_key(function_id, cache_key)
         try:
-            data = config.sync_client.get(key)
+            data = client.get(key)
             if data is None:
                 return None
 
             entry = cls._deserialize(bytes(data))  # type: ignore[arg-type]
             if entry.is_expired():
                 return None
+
             return entry
         except Exception as exc:
             cls._handle_error(exc, "get")
@@ -116,11 +98,11 @@ class RedisStorage:
     @classmethod
     def is_expired(cls, function_id: str, cache_key: str) -> bool:
         """Check if a cache entry is expired or doesn't exist."""
-        cls._require_sync_client()
         config = get_redis_config()
+        client = config.get_client(is_async=False)
         key = cls._make_key(function_id, cache_key)
         try:
-            data = config.sync_client.get(key)
+            data = client.get(key)
             if data is None:
                 return True
 
@@ -133,14 +115,15 @@ class RedisStorage:
     @classmethod
     async def aset(cls, function_id: str, cache_key: str, result: Any, ttl: Number | None):
         """Store a result in Redis cache (async)."""
-        cls._require_async_client()
         config = get_redis_config()
+        client = config.get_client(is_async=True)
         key, data, expiry = cls._prepare_set(function_id, cache_key, result, ttl)
         try:
             if expiry is None:
-                await config.async_client.set(key, data)
-            else:
-                await config.async_client.setex(key, expiry, data)
+                await client.set(key, data)
+                return
+
+            await client.setex(key, expiry, data)
         except Exception as exc:
             cls._handle_error(exc, "aset")
 
@@ -150,17 +133,18 @@ class RedisStorage:
         if skip_cache:
             return None
 
-        cls._require_async_client()
         config = get_redis_config()
+        client = config.get_client(is_async=True)
         key = cls._make_key(function_id, cache_key)
         try:
-            data = await config.async_client.get(key)
+            data = await client.get(key)
             if data is None:
                 return None
 
             entry = cls._deserialize(bytes(data))  # type: ignore[arg-type]
             if entry.is_expired():
                 return None
+
             return entry
         except Exception as exc:
             cls._handle_error(exc, "aget")
@@ -169,11 +153,11 @@ class RedisStorage:
     @classmethod
     async def ais_expired(cls, function_id: str, cache_key: str) -> bool:
         """Check if a cache entry is expired or doesn't exist (async)."""
-        cls._require_async_client()
         config = get_redis_config()
+        client = config.get_client(is_async=True)
         key = cls._make_key(function_id, cache_key)
         try:
-            data = await config.async_client.get(key)
+            data = await client.get(key)
             if data is None:
                 return True
 

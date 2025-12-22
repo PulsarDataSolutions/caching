@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, get_args, overload
 
 if TYPE_CHECKING:
     from redis import Redis
@@ -22,6 +22,27 @@ class RedisConfig:
     key_prefix: str
     lock_timeout: int
     on_error: OnErrorType
+
+    @overload
+    def get_client(self, is_async: Literal[True]) -> AsyncRedis: ...
+
+    @overload
+    def get_client(self, is_async: Literal[False]) -> Redis: ...
+
+    def get_client(self, is_async: bool) -> Redis | AsyncRedis:
+        """Get the appropriate Redis client based on is_async flag."""
+        if is_async:
+            client = self.async_client
+        else:
+            client = self.sync_client
+
+        if not client:
+            mode = "async" if is_async else "sync"
+            raise RuntimeError(
+                f"Redis {mode} client not configured."
+                f"Provide {mode}_client in setup_redis_config() to use @redis_cache on {mode} functions."
+            )
+        return client
 
 
 _redis_config: RedisConfig | None = None
@@ -60,8 +81,8 @@ def setup_redis_config(
     if sync_client is None and async_client is None:
         raise ValueError("At least one of sync_client or async_client must be provided")
 
-    if on_error not in ("silent", "raise"):
-        raise ValueError("on_error must be 'silent' or 'raise'")
+    if on_error not in get_args(OnErrorType):
+        raise ValueError(f"on_error must be one of {get_args(OnErrorType)}")
 
     _redis_config = RedisConfig(
         sync_client=sync_client,

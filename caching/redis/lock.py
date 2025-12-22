@@ -20,16 +20,9 @@ class RedisLockManager:
     def _get_lock(cls, function_id: str, cache_key: str, is_async: bool) -> Any:
         """Get client and create lock."""
         config = get_redis_config()
-        client = config.async_client if is_async else config.sync_client
-        mode = "async" if is_async else "sync"
-
-        if client is None:
-            raise RuntimeError(
-                f"Redis {mode} client not configured. "
-                f"Provide {mode}_client in setup_redis_config() to use @redis_cache on {mode} functions."
-            )
-
+        client = config.get_client(is_async)
         lock_key = cls._make_lock_key(function_id, cache_key)
+
         return client.lock(lock_key, timeout=config.lock_timeout, blocking=True, blocking_timeout=None)
 
     @classmethod
