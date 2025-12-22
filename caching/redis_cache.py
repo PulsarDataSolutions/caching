@@ -1,7 +1,6 @@
 from typing import Callable
 
 from caching.cache import base_cache
-from caching.features.never_die import register_never_die_function
 from caching.redis.lock import RedisLockManager
 from caching.storage.redis_storage import RedisStorage
 from caching.types import CacheConfig, CacheKeyFunction, F, Number
@@ -10,7 +9,6 @@ _REDIS_CONFIG = CacheConfig(
     storage=RedisStorage,
     sync_lock=RedisLockManager.sync_lock,
     async_lock=RedisLockManager.async_lock,
-    register_never_die=register_never_die_function,
 )
 
 

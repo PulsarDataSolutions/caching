@@ -34,7 +34,7 @@ class NeverDieCacheEntry:
     cache_key_func: CacheKeyFunction | None
     ignore_fields: tuple[str, ...]
     loop: AbstractEventLoop | None
-    storage: type[CacheStorage] = field(default=MemoryStorage)
+    storage: CacheStorage
 
     def __post_init__(self):
         self._backoff: float = 1
@@ -145,8 +145,9 @@ def _clear_dead_futures():
 def _clear_dead_threads():
     """Clear dead threads from the cache thread registry"""
     for cache_key, thread in list(_NEVER_DIE_CACHE_THREADS.items()):
-        if not thread.is_alive():
-            del _NEVER_DIE_CACHE_THREADS[cache_key]
+        if thread.is_alive():
+            continue
+        del _NEVER_DIE_CACHE_THREADS[cache_key]
 
 
 def _refresh_never_die_caches():
@@ -170,10 +171,8 @@ def _refresh_never_die_caches():
                     logger.debug(f"Loop is closed for {entry.function.__qualname__}, skipping future creation")
                     continue
 
-                # Doesn't actually run, just creates a coroutine
-                coroutine = _run_async_function_and_cache(entry)
-
                 try:
+                    coroutine = _run_async_function_and_cache(entry)
                     future = asyncio.run_coroutine_threadsafe(coroutine, entry.loop)
                 except RuntimeError:
                     coroutine.close()
@@ -181,7 +180,6 @@ def _refresh_never_die_caches():
                     continue
 
                 _NEVER_DIE_CACHE_FUTURES[entry.cache_key] = future
-
         finally:
             time.sleep(_REFRESH_INTERVAL_SECONDS)
             _clear_dead_futures()
@@ -194,6 +192,7 @@ def _start_never_die_thread():
     with _NEVER_DIE_LOCK:
         if _NEVER_DIE_THREAD and _NEVER_DIE_THREAD.is_alive():
             return
+
         _NEVER_DIE_THREAD = threading.Thread(target=_refresh_never_die_caches, daemon=True)
         _NEVER_DIE_THREAD.start()
 
@@ -205,20 +204,20 @@ def register_never_die_function(
     kwargs: dict,
     cache_key_func: CacheKeyFunction | None,
     ignore_fields: tuple[str, ...],
-    storage: type[CacheStorage] = MemoryStorage,
+    storage: CacheStorage,
 ):
     """Register a function for never_die cache refreshing (memory storage)"""
     is_async = inspect.iscoroutinefunction(function)
 
     entry = NeverDieCacheEntry(
-        function,
-        ttl,
-        args,
-        kwargs,
-        cache_key_func,
-        ignore_fields,
-        asyncio.get_running_loop() if is_async else None,
-        storage,
+        function=function,
+        ttl=ttl,
+        args=args,
+        kwargs=kwargs,
+        cache_key_func=cache_key_func,
+        ignore_fields=ignore_fields,
+        loop=asyncio.get_running_loop() if is_async else None,
+        storage=storage,
     )
 
     with _NEVER_DIE_LOCK:

@@ -40,7 +40,6 @@ class CacheConfig:
     storage: "CacheStorage"
     sync_lock: Callable[[str, str], ContextManager]
     async_lock: Callable[[str, str], AsyncContextManager]
-    register_never_die: Callable[..., None]
 
 
 class CacheEntryProtocol(Protocol):

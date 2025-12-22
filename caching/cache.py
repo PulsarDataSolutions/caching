@@ -4,6 +4,7 @@ from typing import Any, Callable, cast
 
 from caching.storage.memory_storage import MemoryStorage
 from caching.types import CacheConfig, CacheKeyFunction, F, Number
+from caching.features.never_die import register_never_die_function
 from caching.utils.functions import get_function_id
 
 
@@ -24,7 +25,7 @@ def _async_decorator(
         cache_key = MemoryStorage.create_cache_key(function_signature, cache_key_func, ignore_fields, args, kwargs)
 
         if never_die:
-            config.register_never_die(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
+            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
 
         if cache_entry := await config.storage.aget(function_id, cache_key, skip_cache):
             return cache_entry.result
@@ -57,7 +58,7 @@ def _sync_decorator(
         cache_key = MemoryStorage.create_cache_key(function_signature, cache_key_func, ignore_fields, args, kwargs)
 
         if never_die:
-            config.register_never_die(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
+            register_never_die_function(function, ttl, args, kwargs, cache_key_func, ignore_fields, config.storage)
 
         if cache_entry := config.storage.get(function_id, cache_key, skip_cache):
             return cache_entry.result

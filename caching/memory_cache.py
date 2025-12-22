@@ -2,7 +2,6 @@ import threading
 from typing import Callable
 
 from caching.cache import base_cache
-from caching.features.never_die import register_never_die_function
 from caching.storage.memory_storage import MemoryStorage
 from caching.types import CacheConfig, CacheKeyFunction, F, Number
 from caching.utils.locks import ASYNC_LOCKS, SYNC_LOCKS
@@ -14,7 +13,6 @@ _MEMORY_CONFIG = CacheConfig(
     storage=MemoryStorage,
     sync_lock=lambda fid, ckey: SYNC_LOCKS[fid][ckey],
     async_lock=lambda fid, ckey: ASYNC_LOCKS[fid][ckey],
-    register_never_die=register_never_die_function,
 )
 
 
