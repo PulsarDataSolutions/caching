@@ -10,6 +10,7 @@ A simple and robust caching library for Python functions, supporting both synchr
 - Configurable Time-To-Live (TTL) for cached items
 - "Never Die" mode for functions that should keep cache refreshed automatically
 - Skip cache functionality to force fresh function execution while updating cache
+- Redis caching for distributed caching across multiple processes/machines
 
 ## Installation
 
@@ -29,17 +30,47 @@ poetry install
 ```python
 from caching import cache
 
-# Cache function results for 5 minutes (default)
-@cache()
+# Cache function in sync functions
+@cache(ttl=60) # ttl in seconds
 def expensive_calculation(a, b):
     # Some expensive operation
     return a + b
 
-# Async cache with custom TTL (1 hour)
-@cache(ttl=3600)
+# And async functions
+@cache(ttl=3600) # ttl in seconds
 async def another_calculation(url):
     # Some expensive IO call
-    return requests.get(url).json()
+    return await httpx.get(url).json()
+```
+
+### Redis Cache
+
+For distributed caching across multiple processes or machines, use `rcache`:
+
+```python
+import redis
+from caching import setup_redis_config, rcache
+
+# Configure Redis (call once at startup)
+setup_redis_config(
+    sync_client=redis.from_url("redis://localhost:6379/0"),
+    key_prefix="myapp",       # default: "cache", prefix searchable on redis "PREFIX:*"
+    lock_timeout=10,          # default: 10
+    on_error="silent",        # "silent" (default) or "raise" in case of redis errors
+)
+
+@rcache(ttl=300)
+def get_user(user_id: int) -> dict:
+    return fetch_from_database(user_id)
+
+# Async version
+import redis.asyncio as aredis
+
+setup_redis_config(async_client=aredis.from_url("redis://localhost:6379/0"))
+
+@rcache(ttl=300)
+def get_user_async(user_id: int) -> dict:
+    return await fetch_from_database(user_id)
 ```
 
 ### Never Die Cache
@@ -49,9 +80,9 @@ The `never_die` feature ensures that cached values never expire by automatically
 ```python
 # Cache with never_die (automatic refresh)
 @cache(ttl=300, never_die=True)
-def critical_operation(user_id):
+def critical_operation(data_id: str):
     # Expensive operation that should always be available from cache
-    return fetch_data_from_database(user_id)
+    return fetch_data_from_database(data_id)
 ```
 
 **How Never Die Works:**
