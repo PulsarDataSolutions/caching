@@ -5,7 +5,7 @@ import threading
 import time
 from asyncio import AbstractEventLoop
 from concurrent.futures import Future as ConcurrentFuture
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from caching.config import logger
