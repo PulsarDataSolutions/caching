@@ -12,7 +12,7 @@ shell = "scripts.shell:shell"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.15"
-redis = {extras = ["hiredis"], version = "^7.1.0"}
+redis = {extras = ["hiredis"], version = ">5.0.0"}
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
