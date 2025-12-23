@@ -1,5 +1,8 @@
 import pytest
-from caching.cache import cache
+from typing import Any
+from collections.abc import Callable, Coroutine
+
+from caching.memory_cache import cache
 
 TTL = 1
 
@@ -15,7 +18,9 @@ def function_with_cache_key_func_args():
 
 
 @pytest.mark.asyncio
-async def test_cache_key_func_args(function_with_cache_key_func_args):
+async def test_cache_key_func_args(
+    function_with_cache_key_func_args: Callable[..., Coroutine[Any, Any, int]],
+):
     result1 = await function_with_cache_key_func_args(1, 2, 3)
     result2 = await function_with_cache_key_func_args(1, 5, 3)
 
@@ -33,7 +38,9 @@ def function_with_cache_key_func_kwargs():
 
 
 @pytest.mark.asyncio
-async def test_cache_key_func_kwargs(function_with_cache_key_func_kwargs):
+async def test_cache_key_func_kwargs(
+    function_with_cache_key_func_kwargs: Callable[..., Coroutine[Any, Any, int]],
+):
     result1 = await function_with_cache_key_func_kwargs(a=1, b=2, c=3)
     result2 = await function_with_cache_key_func_kwargs(a=1, b=2, c=4)
 
@@ -56,7 +63,9 @@ def function_with_cache_key_func_args_and_kwargs():
 
 
 @pytest.mark.asyncio
-async def test_cache_key_func_args_and_kwargs(function_with_cache_key_func_args_and_kwargs):
+async def test_cache_key_func_args_and_kwargs(
+    function_with_cache_key_func_args_and_kwargs: Callable[..., Coroutine[Any, Any, int]],
+):
     result1 = await function_with_cache_key_func_args_and_kwargs(1, b=2, c=3)
     result2 = await function_with_cache_key_func_args_and_kwargs(1, b=2, c=4)
 

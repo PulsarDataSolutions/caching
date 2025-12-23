@@ -1,7 +1,7 @@
 import asyncio
-
 import pytest
-from caching.cache import cache
+
+from caching.memory_cache import cache
 
 TTL = 0.1
 
@@ -55,14 +55,14 @@ async def test_neverdie_exception():
         nonlocal neverdie_counter
         neverdie_counter += 1
         if neverdie_counter > 2:
-            raise Exception
+            raise RuntimeError("Simulated failure")
         return neverdie_counter
 
     # First call initializes the cache
     await neverdie_fn()
 
     # Wait some time to allow background refreshes to occur
-    await asyncio.sleep(TTL * 4)
+    await asyncio.sleep(TTL * 5)
 
     # At this point, the function got stuck at returning just 3
     assert await neverdie_fn() == 2

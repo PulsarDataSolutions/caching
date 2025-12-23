@@ -1,5 +1,8 @@
 import pytest
-from caching.cache import cache
+from typing import Any
+from collections.abc import Callable, Coroutine
+
+from caching.memory_cache import cache
 
 TTL = 1
 
@@ -15,7 +18,9 @@ def function_with_cache_using_ignore():
 
 
 @pytest.mark.asyncio
-async def test_ignore_arg_param(function_with_cache_using_ignore):
+async def test_ignore_arg_param(
+    function_with_cache_using_ignore: Callable[..., Coroutine[Any, Any, int]],
+):
     result1 = await function_with_cache_using_ignore(a=1, b=2)
     result2 = await function_with_cache_using_ignore(a=1, b=3)
 

@@ -1,5 +1,7 @@
 import pytest
-from caching.cache import cache
+from collections.abc import Callable
+
+from caching.memory_cache import cache
 
 TTL = 1
 
@@ -14,7 +16,7 @@ def function_with_cache_key_func_args():
     return sync_cached_function
 
 
-def test_cache_key_func_args(function_with_cache_key_func_args):
+def test_cache_key_func_args(function_with_cache_key_func_args: Callable[..., int]):
     result1 = function_with_cache_key_func_args(1, 2, 3)
     result2 = function_with_cache_key_func_args(1, 5, 3)
 
@@ -31,7 +33,7 @@ def function_with_cache_key_func_kwargs():
     return sync_cached_function
 
 
-def test_cache_key_func_kwargs(function_with_cache_key_func_kwargs):
+def test_cache_key_func_kwargs(function_with_cache_key_func_kwargs: Callable[..., int]):
     result1 = function_with_cache_key_func_kwargs(a=1, b=2, c=3)
     result2 = function_with_cache_key_func_kwargs(a=1, b=2, c=4)
 
@@ -53,7 +55,9 @@ def function_with_cache_key_func_args_and_kwargs():
     return sync_cached_function
 
 
-def test_cache_key_func_args_and_kwargs(function_with_cache_key_func_args_and_kwargs):
+def test_cache_key_func_args_and_kwargs(
+    function_with_cache_key_func_args_and_kwargs: Callable[..., int],
+):
     result1 = function_with_cache_key_func_args_and_kwargs(1, b=2, c=3)
     result2 = function_with_cache_key_func_args_and_kwargs(1, b=2, c=4)
 

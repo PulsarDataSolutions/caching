@@ -1,5 +1,7 @@
 import pytest
-from caching.cache import cache
+from collections.abc import Callable
+
+from caching.memory_cache import cache
 
 TTL = 1
 
@@ -14,7 +16,7 @@ def function_with_cache_using_ignore():
     return sync_cached_function
 
 
-def test_ignore_arg_param(function_with_cache_using_ignore):
+def test_ignore_arg_param(function_with_cache_using_ignore: Callable[..., int]):
     result1 = function_with_cache_using_ignore(a=1, b=2)
     result2 = function_with_cache_using_ignore(a=1, b=3)
 

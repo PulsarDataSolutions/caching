@@ -2,7 +2,7 @@ import time
 from itertools import count
 from typing_extensions import Unpack
 
-from caching.cache import cache
+from caching.memory_cache import cache
 from caching.types import CacheKwargs
 
 TTL = 0.1
@@ -30,7 +30,7 @@ def test_skip_cache_with_function_arguments():
     counter = count()
 
     @cache(ttl=TTL)
-    def cached_function(arg, **_: Unpack[CacheKwargs]):
+    def cached_function(arg: str, **_: Unpack[CacheKwargs]) -> str:
         return f"{arg}_{next(counter)}"
 
     result1 = cached_function("test")

@@ -5,14 +5,12 @@ import threading
 import time
 from asyncio import AbstractEventLoop
 from concurrent.futures import Future as ConcurrentFuture
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from caching._async.lock import _ASYNC_LOCKS
-from caching._sync.lock import _SYNC_LOCKS
-from caching.bucket import CacheBucket
 from caching.config import logger
-from caching.types import CacheKeyFunction, Number
+from caching.storage.memory_storage import MemoryStorage
+from caching.types import CacheConfig, CacheKeyFunction, Number
 from caching.utils.functions import get_function_id
 
 _NEVER_DIE_THREAD: threading.Thread | None = None
@@ -20,6 +18,10 @@ _NEVER_DIE_LOCK: threading.Lock = threading.Lock()
 _NEVER_DIE_REGISTRY: list["NeverDieCacheEntry"] = []
 _NEVER_DIE_CACHE_THREADS: dict[str, threading.Thread] = {}
 _NEVER_DIE_CACHE_FUTURES: dict[str, ConcurrentFuture] = {}
+
+_MAX_BACKOFF: int = 10
+_BACKOFF_MULTIPLIER: float = 1.25
+_REFRESH_INTERVAL_SECONDS: float = 0.1
 
 
 @dataclass
@@ -31,6 +33,7 @@ class NeverDieCacheEntry:
     cache_key_func: CacheKeyFunction | None
     ignore_fields: tuple[str, ...]
     loop: AbstractEventLoop | None
+    config: CacheConfig
 
     def __post_init__(self):
         self._backoff: float = 1
@@ -43,7 +46,7 @@ class NeverDieCacheEntry:
     @functools.cached_property
     def cache_key(self) -> str:
         function_signature = inspect.signature(self.function)
-        return CacheBucket.create_cache_key(
+        return MemoryStorage.create_cache_key(
             function_signature,
             self.cache_key_func,
             self.ignore_fields,
@@ -67,18 +70,17 @@ class NeverDieCacheEntry:
         self._expires_at = time.monotonic() + self.ttl
 
     def revive(self):
-        self._backoff = min(self._backoff * 1.25, 10)
+        self._backoff = min(self._backoff * _BACKOFF_MULTIPLIER, _MAX_BACKOFF)
         self._expires_at = time.monotonic() + self.ttl * self._backoff
 
 
 def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    with _SYNC_LOCKS[entry.id][entry.cache_key]:
+    with entry.config.sync_lock(entry.id, entry.cache_key):
         try:
             result = entry.function(*entry.args, **entry.kwargs)
-            CacheBucket.set(entry.id, entry.cache_key, result, None)
+            entry.config.storage.set(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -89,12 +91,11 @@ def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
 
 async def _run_async_function_and_cache(entry: NeverDieCacheEntry):
     """Run a function and cache its result"""
-    async with _ASYNC_LOCKS[entry.id][entry.cache_key]:
+    async with entry.config.async_lock(entry.id, entry.cache_key):
         try:
             result = await entry.function(*entry.args, **entry.kwargs)
-            CacheBucket.set(entry.id, entry.cache_key, result, None)
+            await entry.config.storage.aset(entry.id, entry.cache_key, result, None)
             entry.reset()
-
         except BaseException:
             entry.revive()
             logger.debug(
@@ -119,8 +120,9 @@ def _clear_dead_futures():
 def _clear_dead_threads():
     """Clear dead threads from the cache thread registry"""
     for cache_key, thread in list(_NEVER_DIE_CACHE_THREADS.items()):
-        if not thread.is_alive():
-            del _NEVER_DIE_CACHE_THREADS[cache_key]
+        if thread.is_alive():
+            continue
+        del _NEVER_DIE_CACHE_THREADS[cache_key]
 
 
 def _refresh_never_die_caches():
@@ -144,10 +146,8 @@ def _refresh_never_die_caches():
                     logger.debug(f"Loop is closed for {entry.function.__qualname__}, skipping future creation")
                     continue
 
-                # Doesn't actually run, just creates a coroutine
-                coroutine = _run_async_function_and_cache(entry)
-
                 try:
+                    coroutine = _run_async_function_and_cache(entry)
                     future = asyncio.run_coroutine_threadsafe(coroutine, entry.loop)
                 except RuntimeError:
                     coroutine.close()
@@ -155,9 +155,8 @@ def _refresh_never_die_caches():
                     continue
 
                 _NEVER_DIE_CACHE_FUTURES[entry.cache_key] = future
-
         finally:
-            time.sleep(0.1)
+            time.sleep(_REFRESH_INTERVAL_SECONDS)
             _clear_dead_futures()
             _clear_dead_threads()
 
@@ -168,6 +167,7 @@ def _start_never_die_thread():
     with _NEVER_DIE_LOCK:
         if _NEVER_DIE_THREAD and _NEVER_DIE_THREAD.is_alive():
             return
+
         _NEVER_DIE_THREAD = threading.Thread(target=_refresh_never_die_caches, daemon=True)
         _NEVER_DIE_THREAD.start()
 
@@ -179,18 +179,20 @@ def register_never_die_function(
     kwargs: dict,
     cache_key_func: CacheKeyFunction | None,
     ignore_fields: tuple[str, ...],
-) -> None:
+    config: CacheConfig,
+):
     """Register a function for never_die cache refreshing"""
     is_async = inspect.iscoroutinefunction(function)
 
     entry = NeverDieCacheEntry(
-        function,
-        ttl,
-        args,
-        kwargs,
-        cache_key_func,
-        ignore_fields,
-        asyncio.get_event_loop() if is_async else None,
+        function=function,
+        ttl=ttl,
+        args=args,
+        kwargs=kwargs,
+        cache_key_func=cache_key_func,
+        ignore_fields=ignore_fields,
+        loop=asyncio.get_running_loop() if is_async else None,
+        config=config,
     )
 
     with _NEVER_DIE_LOCK:
@@ -198,3 +200,16 @@ def register_never_die_function(
             _NEVER_DIE_REGISTRY.append(entry)
 
     _start_never_die_thread()
+
+
+def clear_never_die_registry():
+    """
+    Clear all entries from the never_die registry.
+
+    Useful for testing to prevent background threads from
+    accessing resources that have been cleaned up.
+    """
+    with _NEVER_DIE_LOCK:
+        _NEVER_DIE_REGISTRY.clear()
+        _NEVER_DIE_CACHE_THREADS.clear()
+        _NEVER_DIE_CACHE_FUTURES.clear()
