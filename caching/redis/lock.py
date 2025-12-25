@@ -41,9 +41,9 @@ class RedisLockManager:
 
         Uses Redis lock with blocking behavior - waits for lock holder to finish.
         """
-        lock: Lock = cls._get_lock(function_id, cache_key, is_async=False)
-        acquired = lock.acquire()
+        lock = cls._get_lock(function_id, cache_key, is_async=False)
         try:
+            acquired = lock.acquire()
             yield
         finally:
             if not acquired:
@@ -60,8 +60,8 @@ class RedisLockManager:
         Uses Redis lock with blocking behavior - waits for lock holder to finish.
         """
         lock = cls._get_lock(function_id, cache_key, is_async=True)
-        acquired = await lock.acquire()
         try:
+            acquired = await lock.acquire()
             yield
         finally:
             if not acquired:

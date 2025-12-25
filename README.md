@@ -55,7 +55,7 @@ from caching import setup_redis_config, rcache
 setup_redis_config(
     sync_client=redis.from_url("redis://localhost:6379/0"),
     key_prefix="myapp",       # default: "cache", prefix searchable on redis "PREFIX:*"
-    lock_timeout=10,          # default: 10
+    lock_timeout=10,          # default: 10, maximum lock lifetime in seconds
     on_error="silent",        # "silent" (default) or "raise" in case of redis errors
 )
 
