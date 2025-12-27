@@ -43,11 +43,17 @@ async def async_redis_client():
 @pytest.fixture(autouse=True)
 def reset_config():
     """Reset Redis config and never_die registry before each test."""
+    from caching.redis.lock import _AsyncHeartbeatManager, _SyncHeartbeatManager
+
     clear_never_die_registry()
     reset_redis_config()
+    _AsyncHeartbeatManager.reset()
+    _SyncHeartbeatManager.reset()
     yield
     clear_never_die_registry()
     reset_redis_config()
+    _AsyncHeartbeatManager.reset()
+    _SyncHeartbeatManager.reset()
 
 
 @pytest.fixture(autouse=True)
