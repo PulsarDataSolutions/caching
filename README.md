@@ -2,6 +2,19 @@
 
 A simple and robust caching library for Python functions, supporting both synchronous and asynchronous code.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Basic Usage](#basic-usage)
+  - [Redis Cache](#redis-cache)
+  - [Never Die Cache](#never-die-cache)
+  - [Skip Cache](#skip-cache)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Features
 
 - Cache function results based on function ID and arguments
@@ -15,12 +28,8 @@ A simple and robust caching library for Python functions, supporting both synchr
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/PulsarDefi/cachify.git
-cd cachify
-
-# Install the package
-poetry install
+# Adding to your project
+poetry add cachify
 ```
 
 ## Usage
@@ -54,7 +63,7 @@ from cachify import setup_redis_config, rcache
 # Configure Redis (call once at startup)
 setup_redis_config(
     sync_client=redis.from_url("redis://localhost:6379/0"),
-    key_prefix="myapp",       # default: "key_prefix", prefix searchable on redis "PREFIX:*"
+    key_prefix="myapp",       # default: "cachify", prefix searchable on redis "PREFIX:*"
     lock_timeout=10,          # default: 10, maximum lock lifetime in seconds
     on_error="silent",        # "silent" (default) or "raise" in case of redis errors
 )
@@ -140,6 +149,10 @@ Run the test scripts
 poetry run python -m pytest
 ```
 
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/PulsarDataSolutions/cachify/blob/master/LICENSE) file for details.
