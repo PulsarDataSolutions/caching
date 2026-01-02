@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-import logging
 import threading
 import time
 from contextlib import asynccontextmanager, contextmanager
@@ -10,9 +9,8 @@ from typing import AsyncIterator, Iterator, Literal, overload
 from redis.lock import Lock
 from redis.asyncio.lock import Lock as AsyncLock
 
+from caching.config import logger
 from caching.redis.config import get_redis_config
-
-logger = logging.getLogger(__name__)
 
 HEARTBEAT_INTERVAL = 1
 
@@ -28,7 +26,7 @@ class _ActiveLockBase:
         elapsed = time.monotonic() - self.last_extended_at
         return elapsed >= self.timeout / 2
 
-    def mark_extended(self) -> None:
+    def mark_extended(self):
         self.last_extended_at = time.monotonic()
 
 
@@ -69,16 +67,16 @@ class _AsyncHeartbeatManager:
     _task: asyncio.Task | None = None
 
     @classmethod
-    def register(cls, key: str, lock: AsyncLock, timeout: float) -> None:
+    def register(cls, key: str, lock: AsyncLock, timeout: float):
         cls._locks[key] = _ActiveAsyncLock(timeout=timeout, lock=lock)
         cls._ensure_worker_running()
 
     @classmethod
-    def unregister(cls, key: str) -> None:
+    def unregister(cls, key: str):
         cls._locks.pop(key, None)
 
     @classmethod
-    def reset(cls) -> None:
+    def reset(cls):
         """Cancel worker and clear state. Used for testing cleanup."""
         cls._locks.clear()
         if cls._task is not None and not cls._task.done():
@@ -87,12 +85,12 @@ class _AsyncHeartbeatManager:
         cls._task = None
 
     @classmethod
-    def _ensure_worker_running(cls) -> None:
+    def _ensure_worker_running(cls):
         if cls._task is None or cls._task.done():
             cls._task = asyncio.create_task(cls._worker())
 
     @classmethod
-    async def _worker(cls) -> None:
+    async def _worker(cls):
         while True:
             await asyncio.sleep(HEARTBEAT_INTERVAL)
 
@@ -104,7 +102,7 @@ class _AsyncHeartbeatManager:
                 if not active.should_extend():
                     continue
                 if not await active.extend():
-                    logger.warning(f"Failed to extend lock {key}, it may have expired")
+                    logger.warning(f"Failed to extend lock, it may have expired", extra={"lock_key": key})
 
 
 class _SyncHeartbeatManager:
@@ -115,29 +113,29 @@ class _SyncHeartbeatManager:
     _state_lock: threading.Lock = threading.Lock()
 
     @classmethod
-    def register(cls, key: str, lock: Lock, timeout: float) -> None:
+    def register(cls, key: str, lock: Lock, timeout: float):
         with cls._state_lock:
             cls._locks[key] = _ActiveSyncLock(timeout=timeout, lock=lock)
             cls._ensure_worker_running()
 
     @classmethod
-    def unregister(cls, key: str) -> None:
+    def unregister(cls, key: str):
         cls._locks.pop(key, None)
 
     @classmethod
-    def reset(cls) -> None:
+    def reset(cls):
         """Clear state. Used for testing cleanup. Thread exits on next iteration when _locks is empty."""
         cls._locks.clear()
         cls._thread = None
 
     @classmethod
-    def _ensure_worker_running(cls) -> None:
+    def _ensure_worker_running(cls):
         if cls._thread is None or not cls._thread.is_alive():
             cls._thread = threading.Thread(target=cls._worker, daemon=True)
             cls._thread.start()
 
     @classmethod
-    def _worker(cls) -> None:
+    def _worker(cls):
         while True:
             time.sleep(HEARTBEAT_INTERVAL)
 
@@ -151,7 +149,7 @@ class _SyncHeartbeatManager:
                 if not active.should_extend():
                     continue
                 if not active.extend():
-                    logger.warning(f"Failed to extend lock {key}, it may have expired")
+                    logger.warning(f"Failed to extend lock, it may have expired", extra={"lock_key": key})
 
 
 class RedisLockManager:

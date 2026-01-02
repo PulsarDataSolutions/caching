@@ -78,7 +78,8 @@ def _run_sync_function_and_cache(entry: NeverDieCacheEntry):
         except BaseException:
             entry.revive()
             logger.debug(
-                f"Exception caching {entry.function.__qualname__}, reviving previous entry",
+                f"Exception caching function with never_die",
+                extra={"function": entry.function.__qualname__},
                 exc_info=True,
             )
 
@@ -93,7 +94,8 @@ async def _run_async_function_and_cache(entry: NeverDieCacheEntry):
         except BaseException:
             entry.revive()
             logger.debug(
-                f"Exception caching {entry.function.__qualname__}, reviving previous entry",
+                f"Exception caching function with never_die",
+                extra={"function": entry.function.__qualname__},
                 exc_info=True,
             )
 
@@ -137,7 +139,11 @@ def _refresh_never_die_caches():
                     continue
 
                 if entry.loop.is_closed():
-                    logger.debug(f"Loop is closed for {entry.function.__qualname__}, skipping future creation")
+                    logger.debug(
+                        f"Loop is closed, skipping future creation",
+                        extra={"function": entry.function.__qualname__},
+                        exc_info=True,
+                    )
                     continue
 
                 try:
@@ -145,7 +151,11 @@ def _refresh_never_die_caches():
                     future = asyncio.run_coroutine_threadsafe(coroutine, entry.loop)
                 except RuntimeError:
                     coroutine.close()
-                    logger.debug(f"Loop is closed for {entry.function.__qualname__}, skipping future creation")
+                    logger.debug(
+                        f"Loop is closed, skipping future creation",
+                        extra={"function": entry.function.__qualname__},
+                        exc_info=True,
+                    )
                     continue
 
                 _NEVER_DIE_CACHE_FUTURES[entry.cache_key] = future

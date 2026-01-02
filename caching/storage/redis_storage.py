@@ -57,13 +57,13 @@ class RedisStorage:
         return key, data, int(ttl * 1000)
 
     @classmethod
-    def _handle_error(cls, exc: Exception, operation: str):
+    def _handle_error(cls, exc: Exception, operation: str, cache_key: str):
         """Handle Redis errors based on config."""
         config = get_redis_config()
         if config.on_error == "raise":
             raise
 
-        logger.warning(f"Redis {operation} error (silent mode): {exc}")
+        logger.debug(f"Redis operation error: {exc}", extra={"operation": operation, "cache_key": cache_key})
 
     @classmethod
     def _handle_get_result(cls, data: bytes | None) -> RedisCacheEntry | None:
@@ -90,7 +90,7 @@ class RedisStorage:
 
             client.psetex(key, expiry_ms, data)
         except Exception as exc:
-            cls._handle_error(exc, "set")
+            cls._handle_error(exc, "set", cache_key)
 
     @classmethod
     def get(cls, cache_key: str, skip_cache: bool) -> RedisCacheEntry | None:
@@ -104,7 +104,7 @@ class RedisStorage:
         try:
             return cls._handle_get_result(client.get(key))  # type: ignore[arg-type]
         except Exception as exc:
-            cls._handle_error(exc, "get")
+            cls._handle_error(exc, "get", cache_key)
             return None
 
     @classmethod
@@ -120,7 +120,7 @@ class RedisStorage:
 
             await client.psetex(key, expiry_ms, data)
         except Exception as exc:
-            cls._handle_error(exc, "aset")
+            cls._handle_error(exc, "aset", cache_key)
 
     @classmethod
     async def aget(cls, cache_key: str, skip_cache: bool) -> RedisCacheEntry | None:
@@ -134,5 +134,5 @@ class RedisStorage:
         try:
             return cls._handle_get_result(await client.get(key))  # type: ignore[arg-type]
         except Exception as exc:
-            cls._handle_error(exc, "aget")
+            cls._handle_error(exc, "aget", cache_key)
             return None
