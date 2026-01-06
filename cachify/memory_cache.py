@@ -13,6 +13,7 @@ _MEMORY_CONFIG = CacheConfig(
     storage=MemoryStorage,
     sync_lock=lambda cache_key: SYNC_LOCKS[cache_key],
     async_lock=lambda cache_key: ASYNC_LOCKS[cache_key],
+    process_isolated=True,
 )
 
 

@@ -35,11 +35,12 @@ class CacheEntry:
 
 @dataclass(frozen=True, slots=True)
 class CacheConfig:
-    """Configuration for cache, grouping storage, lock, and never_die registration."""
+    """Configuration for cache, grouping storage, lock, never_die registration and process-isolated indicator."""
 
     storage: "CacheStorage"
     sync_lock: Callable[[str], ContextManager]
     async_lock: Callable[[str], AsyncContextManager]
+    process_isolated: bool
 
 
 class CacheEntryProtocol(Protocol):

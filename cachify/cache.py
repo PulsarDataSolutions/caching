@@ -18,7 +18,7 @@ def _async_decorator(
     @functools.wraps(function)
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         skip_cache = kwargs.pop("skip_cache", False)
-        cache_key = create_cache_key(function, cache_key_func, ignore_fields, args, kwargs)
+        cache_key = create_cache_key(function, cache_key_func, ignore_fields, args, kwargs, config.process_isolated)
 
         if cache_entry := await config.storage.aget(cache_key, skip_cache):
             return cache_entry.result
@@ -49,7 +49,7 @@ def _sync_decorator(
     @functools.wraps(function)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         skip_cache = kwargs.pop("skip_cache", False)
-        cache_key = create_cache_key(function, cache_key_func, ignore_fields, args, kwargs)
+        cache_key = create_cache_key(function, cache_key_func, ignore_fields, args, kwargs, config.process_isolated)
 
         if cache_entry := config.storage.get(cache_key, skip_cache):
             return cache_entry.result

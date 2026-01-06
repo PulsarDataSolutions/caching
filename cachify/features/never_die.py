@@ -46,6 +46,7 @@ class NeverDieCacheEntry:
             self.ignore_fields,
             self.args,
             self.kwargs,
+            self.config.process_isolated,
         )
 
     def __eq__(self, other: Any) -> bool:

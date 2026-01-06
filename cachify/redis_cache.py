@@ -9,6 +9,7 @@ _REDIS_CONFIG = CacheConfig(
     storage=RedisStorage,
     sync_lock=RedisLockManager.sync_lock,
     async_lock=RedisLockManager.async_lock,
+    process_isolated=False,
 )
 
 
