@@ -12,12 +12,13 @@ rcache = redis_cache
 
 __all__ = [
     "__version__",
-    "cache",
     "rcache",
-    "redis_cache",
-    "setup_redis_config",
+    "clear_never_die_registry",
+    "cache",
+    "DEFAULT_KEY_PREFIX",
     "get_redis_config",
     "reset_redis_config",
-    "DEFAULT_KEY_PREFIX",
+    "setup_redis_config",
+    "redis_cache",
     "CacheKwargs",
 ]

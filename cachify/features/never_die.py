@@ -140,19 +140,19 @@ def _refresh_never_die_caches():
 
                 if entry.loop.is_closed():
                     logger.debug(
-                        f"Loop is closed, skipping future creation",
+                        "Loop is closed, skipping future creation",
                         extra={"function": entry.function.__qualname__},
                         exc_info=True,
                     )
                     continue
 
+                coroutine = _run_async_function_and_cache(entry)
                 try:
-                    coroutine = _run_async_function_and_cache(entry)
                     future = asyncio.run_coroutine_threadsafe(coroutine, entry.loop)
                 except RuntimeError:
                     coroutine.close()
                     logger.debug(
-                        f"Loop is closed, skipping future creation",
+                        "Loop is closed, skipping future creation",
                         extra={"function": entry.function.__qualname__},
                         exc_info=True,
                     )
