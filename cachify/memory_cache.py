@@ -1,18 +1,22 @@
+import asyncio
 import threading
+from collections import defaultdict
 from typing import Callable
 
 from cachify.cache import base_cache
 from cachify.storage.memory_storage import MemoryStorage
 from cachify.types import CacheConfig, CacheKeyFunction, F, Number
-from cachify.utils.locks import ASYNC_LOCKS, SYNC_LOCKS
 
 _CACHE_CLEAR_THREAD: threading.Thread | None = None
 _CACHE_CLEAR_LOCK: threading.Lock = threading.Lock()
 
+_ASYNC_LOCKS: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+_SYNC_LOCKS: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
+
 _MEMORY_CONFIG = CacheConfig(
     storage=MemoryStorage,
-    sync_lock=lambda cache_key: SYNC_LOCKS[cache_key],
-    async_lock=lambda cache_key: ASYNC_LOCKS[cache_key],
+    sync_lock=_SYNC_LOCKS.__getitem__,
+    async_lock=_ASYNC_LOCKS.__getitem__,
 )
 
 
