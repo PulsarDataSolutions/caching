@@ -1,8 +1,8 @@
 import hashlib
 import inspect
-import logging
 import pickle
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping, Sequence, Set
+from contextlib import suppress
 from inspect import Signature
 from typing import Any
 
@@ -10,20 +10,57 @@ from cachify.types import CacheKeyFunction
 from cachify.utils.functions import get_function_id
 
 
-def _cache_key_fingerprint(value: object, process_isolated: bool) -> str:
+def _process_isolated_fingerprint(value: Any) -> str:
+    stack = [value]
+    seen = set()
+    result = hashlib.blake2b(digest_size=16)
+
+    while stack:
+        current = stack.pop()
+        current_id = id(current)
+
+        # Avoid processing the same object multiple times
+        if current_id in seen:
+            continue
+        seen.add(current_id)
+
+        with suppress(TypeError):
+            result.update(hash(current).to_bytes(8, "big", signed=True))
+            continue
+
+        if isinstance(current, Sequence):
+            stack.extend(current)
+            continue
+
+        if isinstance(current, Set):
+            stack.extend(sorted(current))
+            continue
+
+        if isinstance(current, Mapping):
+            stack.extend(current.items())
+            continue
+
+        result.update(current_id.to_bytes(8, "big", signed=True))
+
+    return result.hexdigest()
+
+
+def _process_shared_fingerprint(value: Any) -> str:
     try:
         payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
 
-    except (pickle.PicklingError, TypeError) as exc:
-        if not process_isolated:
-            raise ValueError(
-                "Process-shared cache key contains non-picklable items - Consider ignoring suspect fields"
-            ) from exc
-
-        payload = id(value).to_bytes(8, byteorder="big", signed=True)
-        logging.debug("Using process-isolated cache key generation for non-picklable cache key items.")
+    except (pickle.PicklingError, TypeError, AttributeError) as exc:
+        raise ValueError(
+            "Process-shared cache key contains non-picklable items - Consider ignoring suspect fields"
+        ) from exc
 
     return hashlib.blake2b(payload, digest_size=16).hexdigest()
+
+
+def _cache_key_fingerprint(value: Any, process_isolated: bool) -> str:
+    if process_isolated:
+        return _process_isolated_fingerprint(value)
+    return _process_shared_fingerprint(value)
 
 
 def _iter_arguments(
