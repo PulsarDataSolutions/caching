@@ -60,12 +60,13 @@ async def another_calculation(url):
 
 ### Decorator Parameters
 
-| Parameter        | Type              | Default | Description                                          |
-| ---------------- | ----------------- | ------- | ---------------------------------------------------- |
-| `ttl`            | `int \| float`    | `300`   | Time to live for cached items in seconds             |
-| `never_die`      | `bool`            | `False` | If True, cache refreshes automatically in background |
-| `cache_key_func` | `Callable`        | `None`  | Custom function to generate cache keys               |
-| `ignore_fields`  | `tuple[str, ...]` | `()`    | Function parameters to exclude from cache key        |
+| Parameter        | Type            | Default | Description                                                    |
+| ---------------- | --------------- | ------- | -------------------------------------------------------------- |
+| `ttl`            | `int \| float`  | `300`   | Time to live for cached items in seconds                       |
+| `never_die`      | `bool`          | `False` | If True, cache refreshes automatically in background           |
+| `cache_key_func` | `Callable`      | `None`  | Custom function to generate cache keys                         |
+| `ignore_fields`  | `Sequence[str]` | `()`    | Function parameters to exclude from cache key                  |
+| `no_self`        | `bool`          | `False` | If True, ignores the first parameter (usually `self` or `cls`) |
 
 ### Custom Cache Key Function
 
