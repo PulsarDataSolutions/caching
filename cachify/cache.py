@@ -93,11 +93,13 @@ def base_cache(
         - Only allows one execution at a time per function+args
         - Makes subsequent calls wait for the first call to complete
     """
+
     if cache_key_func and (ignore_fields or no_self):
         raise ValueError("Either cache_key_func or ignore_fields can be provided, but not both")
 
     def decorator(function: F) -> F:
-        ignore = tuple(*ignore_fields)
+        ignore = tuple(ignore_fields)
+
         if no_self:
             ignore += function.__code__.co_varnames[:1]
 
