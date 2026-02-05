@@ -1,15 +1,20 @@
 ﻿from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, get_args, overload
+from typing import TYPE_CHECKING, Literal, TypeAlias, get_args, overload
 
 if TYPE_CHECKING:
     from redis import Redis
     from redis.asyncio import Redis as AsyncRedis
+    from redis.cluster import RedisCluster
+    from redis.asyncio.cluster import RedisCluster as AsyncRedisCluster
+
+SyncRedisClient: TypeAlias = "Redis | RedisCluster"
+AsyncRedisClient: TypeAlias = "AsyncRedis | AsyncRedisCluster"
 
 OnErrorType = Literal["silent", "raise"]
 
-DEFAULT_KEY_PREFIX = "cachify"
+DEFAULT_KEY_PREFIX = "{cachify}"
 DEFAULT_LOCK_TIMEOUT = 10
 
 
@@ -17,19 +22,19 @@ DEFAULT_LOCK_TIMEOUT = 10
 class RedisConfig:
     """Configuration for Redis cache backend."""
 
-    sync_client: Redis | None
-    async_client: AsyncRedis | None
+    sync_client: SyncRedisClient | None
+    async_client: AsyncRedisClient | None
     key_prefix: str
     lock_timeout: int
     on_error: OnErrorType
 
     @overload
-    def get_client(self, is_async: Literal[True]) -> AsyncRedis: ...
+    def get_client(self, is_async: Literal[True]) -> AsyncRedisClient: ...
 
     @overload
-    def get_client(self, is_async: Literal[False]) -> Redis: ...
+    def get_client(self, is_async: Literal[False]) -> SyncRedisClient: ...
 
-    def get_client(self, is_async: bool) -> Redis | AsyncRedis:
+    def get_client(self, is_async: bool) -> SyncRedisClient | AsyncRedisClient:
         """Get the appropriate Redis client based on is_async flag."""
         if is_async:
             client = self.async_client
@@ -49,8 +54,8 @@ _redis_config: RedisConfig | None = None
 
 
 def setup_redis_config(
-    sync_client: Redis | None = None,
-    async_client: AsyncRedis | None = None,
+    sync_client: SyncRedisClient | None = None,
+    async_client: AsyncRedisClient | None = None,
     key_prefix: str = DEFAULT_KEY_PREFIX,
     lock_timeout: int = DEFAULT_LOCK_TIMEOUT,
     on_error: OnErrorType = "silent",
@@ -64,7 +69,7 @@ def setup_redis_config(
     Args:
         sync_client: Redis sync client instance (redis.Redis)
         async_client: Redis async client instance (redis.asyncio.Redis)
-        key_prefix: Prefix for all cache keys in Redis (default: "cache")
+        key_prefix: Prefix for all cache keys in Redis (default: "{cachify}")
         lock_timeout: Timeout in seconds for distributed locks (default: 10)
         on_error: Error handling mode - "silent" treats errors as cache miss,
                   "raise" propagates exceptions (default: "silent")

@@ -109,7 +109,7 @@ from cachify import setup_redis_config, rcache
 # Configure Redis (call once at startup)
 setup_redis_config(
     sync_client=redis.from_url("redis://localhost:6379/0"),
-    key_prefix="myapp",       # default: "cachify", prefix searchable on redis "PREFIX:*"
+    key_prefix="{myapp}",       # default: "{cachify}", prefix searchable on redis "PREFIX:*"
     lock_timeout=10,          # default: 10, maximum lock lifetime in seconds
     on_error="silent",        # "silent" (default) or "raise" in case of redis errors
 )
